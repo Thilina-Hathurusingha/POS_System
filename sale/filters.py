@@ -4,6 +4,9 @@ Filters Panel - Top left section with category, vendor dropdowns and search.
 
 import tkinter as tk
 from tkinter import ttk
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class FilterPanel(tk.Frame):
@@ -28,6 +31,8 @@ class FilterPanel(tk.Frame):
             parent: Parent widget
             on_filter_change: Callback when filters change
         """
+        logger.debug("ENTRY: FilterPanel.__init__()")
+        
         if 'bg' not in kwargs:
             kwargs['bg'] = self.BG_PANEL
         super().__init__(parent, **kwargs)
@@ -36,7 +41,12 @@ class FilterPanel(tk.Frame):
         self.categories = []
         self.vendors = []
         
-        self._create_ui()
+        try:
+            self._create_ui()
+            logger.debug("EXIT: FilterPanel.__init__() - Success")
+        except Exception as e:
+            logger.error(f"Failed to initialize FilterPanel: {str(e)}", exc_info=True)
+            raise
 
     def _create_ui(self):
         """Create UI components"""

@@ -3,6 +3,9 @@ Checkout Panel - Bottom right section with summary and action buttons.
 """
 
 import tkinter as tk
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class CheckoutPanel(tk.Frame):
@@ -33,26 +36,34 @@ class CheckoutPanel(tk.Frame):
             on_checkout: Callback for checkout button
             on_checkout_print: Callback for checkout & print button
         """
+        logger.debug("ENTRY: CheckoutPanel.__init__()")
+        
         if 'bg' not in kwargs:
             kwargs['bg'] = self.BG_PANEL
         super().__init__(parent, **kwargs)
         
-        # ========== Store Callback Functions ==========
-        # Callbacks for order management operations
-        self.on_clear = on_clear  # Clear entire order
-        self.on_checkout = on_checkout  # Process payment
-        self.on_checkout_print = on_checkout_print  # Process payment and print receipt
-        
-        # ========== Order Summary Variables ==========
-        # These track the order totals that will be displayed
-        self.discount_amount = 0.0  # Total discount applied
-        self.total_amount = 0.0  # Total amount before payment
-        self.amount_received = 0.0  # Cash received from customer
-        self.change_amount = 0.0  # Change to give back to customer
-        
-        # ========== Create UI ==========
-        # Build summary display and action buttons
-        self._create_ui()
+        try:
+            # ========== Store Callback Functions ==========
+            # Callbacks for order management operations
+            self.on_clear = on_clear  # Clear entire order
+            self.on_checkout = on_checkout  # Process payment
+            self.on_checkout_print = on_checkout_print  # Process payment and print receipt
+            
+            # ========== Order Summary Variables ==========
+            # These track the order totals that will be displayed
+            self.discount_amount = 0.0  # Total discount applied
+            self.total_amount = 0.0  # Total amount before payment
+            self.amount_received = 0.0  # Cash received from customer
+            self.change_amount = 0.0  # Change to give back to customer
+            
+            # ========== Create UI ==========
+            # Build summary display and action buttons
+            self._create_ui()
+            logger.debug("EXIT: CheckoutPanel.__init__() - Success")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize CheckoutPanel: {str(e)}", exc_info=True)
+            raise
 
     def _create_ui(self):
         """Create checkout UI"""

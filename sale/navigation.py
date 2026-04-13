@@ -3,6 +3,9 @@ Navigation Panel - Bottom left section with pagination controls.
 """
 
 import tkinter as tk
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class NavigationPanel(tk.Frame):
@@ -27,25 +30,33 @@ class NavigationPanel(tk.Frame):
             parent: Parent widget
             on_page_change: Callback when page changes
         """
+        logger.debug("ENTRY: NavigationPanel.__init__()")
+        
         if 'bg' not in kwargs:
             kwargs['bg'] = self.BG_PANEL
         super().__init__(parent, **kwargs)
         
-        # ========== Store Callback ==========
-        # Called whenever user navigates to a different page
-        self.on_page_change = on_page_change
-        
-        # ========== Pagination State ==========
-        # Track current page number (1-indexed)
-        self.current_page = 1
-        # Total number of pages available
-        self.total_pages = 1
-        # List of page number button widgets
-        self.page_buttons = []
-        
-        # ========== Create UI ==========
-        # Build pagination controls (first, prev, page numbers, next, last)
-        self._create_ui()
+        try:
+            # ========== Store Callback ==========
+            # Called whenever user navigates to a different page
+            self.on_page_change = on_page_change
+            
+            # ========== Pagination State ==========
+            # Track current page number (1-indexed)
+            self.current_page = 1
+            # Total number of pages available
+            self.total_pages = 1
+            # List of page number button widgets
+            self.page_buttons = []
+            
+            # ========== Create UI ==========
+            # Build pagination controls (first, prev, page numbers, next, last)
+            self._create_ui()
+            logger.debug("EXIT: NavigationPanel.__init__() - Success")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize NavigationPanel: {str(e)}", exc_info=True)
+            raise
 
     def _create_ui(self):
         """Create pagination UI"""

@@ -4,6 +4,9 @@ Order Table Panel - Top right section displaying order items in a Treeview.
 
 import tkinter as tk
 from tkinter import ttk
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class OrderTablePanel(tk.Frame):
@@ -32,26 +35,34 @@ class OrderTablePanel(tk.Frame):
             on_delete: Callback when delete button clicked
             on_settings: Callback when settings button clicked
         """
+        logger.debug("ENTRY: OrderTablePanel.__init__()")
+        
         if 'bg' not in kwargs:
             kwargs['bg'] = self.BG_PANEL
         super().__init__(parent, **kwargs)
         
-        # ========== Store Callback Functions ==========
-        # These callbacks are triggered for various order management operations
-        self.on_quantity_change = on_quantity_change  # Called when item quantity changes
-        self.on_delete = on_delete  # Called when user deletes an item
-        self.on_settings = on_settings  # Called for item settings/options
-        
-        # ========== Order Items Storage ==========
-        # Dictionary mapping product_id to {product, quantity, row_id}
-        # Helps quick lookup and updates of items in the order
-        self.items = {}
-        # Dictionary mapping product_id to StringVar for quantity input
-        self.quantity_vars = {}
-        
-        # ========== Create UI Components ==========
-        # Build the table display with columns and styling
-        self._create_ui()
+        try:
+            # ========== Store Callback Functions ==========
+            # These callbacks are triggered for various order management operations
+            self.on_quantity_change = on_quantity_change  # Called when item quantity changes
+            self.on_delete = on_delete  # Called when user deletes an item
+            self.on_settings = on_settings  # Called for item settings/options
+            
+            # ========== Order Items Storage ==========
+            # Dictionary mapping product_id to {product, quantity, row_id}
+            # Helps quick lookup and updates of items in the order
+            self.items = {}
+            # Dictionary mapping product_id to StringVar for quantity input
+            self.quantity_vars = {}
+            
+            # ========== Create UI Components ==========
+            # Build the table display with columns and styling
+            self._create_ui()
+            logger.debug("EXIT: OrderTablePanel.__init__() - Success")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize OrderTablePanel: {str(e)}", exc_info=True)
+            raise
 
     def _create_ui(self):
         """Create table UI"""

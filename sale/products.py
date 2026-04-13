@@ -4,6 +4,9 @@ Products Panel - Middle left section displaying product cards in a grid.
 
 import tkinter as tk
 from tkinter import ttk
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ItemCard(tk.Frame):
