@@ -4,7 +4,7 @@ Filters Panel - Top left section with category, vendor dropdowns and search.
 
 import tkinter as tk
 from tkinter import ttk
-from logging_config import get_logger
+from log.logging_config import get_logger
 
 logger = get_logger(__name__)
 

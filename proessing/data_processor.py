@@ -8,7 +8,7 @@ import queue
 import time
 from dataclasses import dataclass
 from typing import List, Dict, Any
-from logging_config import get_logger
+from log.logging_config import get_logger
 
 # ========== Initialize Logger ==========
 logger = get_logger(__name__)

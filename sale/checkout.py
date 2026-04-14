@@ -3,7 +3,7 @@ Checkout Panel - Bottom right section with summary and action buttons.
 """
 
 import tkinter as tk
-from logging_config import get_logger
+from log.logging_config import get_logger
 
 logger = get_logger(__name__)
 

@@ -6,9 +6,9 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 import queue
-from data_processor import DataProcessor
-from sale_page import SalePage
-from logging_config import AppLogger, get_logger
+from proessing.data_processor import DataProcessor
+from sale.sale_page import SalePage
+from log.logging_config import AppLogger, get_logger
 
 # ========== Initialize Logging ==========
 # Setup logging with default ERROR level

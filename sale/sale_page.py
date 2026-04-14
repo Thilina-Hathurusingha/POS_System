@@ -9,7 +9,7 @@ from sale.products import ProductsPanel
 from sale.navigation import NavigationPanel
 from sale.table import OrderTablePanel
 from sale.checkout import CheckoutPanel
-from logging_config import get_logger
+from log.logging_config import get_logger
 
 # ========== Initialize Logger ==========
 logger = get_logger(__name__)
