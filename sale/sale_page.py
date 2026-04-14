@@ -51,6 +51,10 @@ class SalePage(tk.Frame):
             self.current_page = 1
             # Store active filter criteria (category, vendor, search)
             self.current_filters = {}
+            # Track asynchronous request IDs
+            self.categories_request_id = None
+            self.products_request_id = None
+            self.filter_request_id = None
             logger.debug("State variables initialized")
             
             # ========== Build UI and Load Data ==========
@@ -173,36 +177,88 @@ class SalePage(tk.Frame):
             raise
 
     def _load_initial_data(self):
-        """Load initial data from data processor"""
+        """Load initial data from data processor asynchronously"""
         logger.debug("ENTRY: SalePage._load_initial_data()")
         
         try:
-            if self.data_processor:
-                logger.debug("Fetching initial products page...")
-                products_page = self.data_processor.get_products_page(1)
+            # Get reference to main app for sending requests
+            root = self.winfo_toplevel()
+            if hasattr(root, 'send_request_to_processor'):
+                logger.debug("Sending requests for categories, vendors, and products to data processor...")
                 
-                # Update filter dropdowns
-                logger.debug(f"Updating filter dropdowns with {len(self.data_processor.categories)} categories and {len(self.data_processor.vendors)} vendors")
-                self.filter_panel.update_categories(self.data_processor.categories)
-                self.filter_panel.update_vendors(self.data_processor.vendors)
-                
-                # Display products
-                logger.debug(f"Displaying {len(products_page['products'])} products")
-                self.products_panel.display_products(products_page['products'])
-                
-                # Update pagination
-                logger.debug(f"Updating pagination: page {products_page['current_page']} of {products_page['total_pages']}")
-                self.navigation_panel.set_page_info(
-                    products_page['current_page'],
-                    products_page['total_pages']
+                # Request 1: Get categories and vendors
+                self.categories_request_id = root.send_request_to_processor(
+                    action='get_categories_vendors'
                 )
+                logger.debug(f"Sent categories/vendors request: {self.categories_request_id}")
+                
+                # Request 2: Get first page of products
+                self.products_request_id = root.send_request_to_processor(
+                    action='get_products_page',
+                    request_data={'page': 1, 'items_per_page': 20}
+                )
+                logger.debug(f"Sent products page request: {self.products_request_id}")
+                
+                # Schedule checking for responses (non-blocking)
+                self.after(100, self._check_initial_data_responses, root)
             else:
-                logger.warning("Data processor not available, skipping initial data load")
+                logger.warning("Main app not available, cannot send requests")
             
-            logger.debug("EXIT: SalePage._load_initial_data() - Success")
+            logger.debug("EXIT: SalePage._load_initial_data()")
             
         except Exception as e:
             logger.error(f"Failed to load initial data: {str(e)}", exc_info=True)
+
+    def _check_initial_data_responses(self, root):
+        """Check if initial data responses are ready"""
+        logger.debug("ENTRY: SalePage._check_initial_data_responses()")
+        
+        try:
+            responses_received = 0
+            
+            # Check for categories/vendors response
+            if hasattr(self, 'categories_request_id') and not hasattr(self, 'categories_loaded'):
+                response = root.get_response(self.categories_request_id)
+                if response:
+                    logger.debug(f"Received categories/vendors response")
+                    categories = response.get('categories', [])
+                    vendors = response.get('vendors', [])
+                    logger.debug(f"Updating filter dropdowns with {len(categories)} categories and {len(vendors)} vendors")
+                    self.filter_panel.update_categories(categories)
+                    self.filter_panel.update_vendors(vendors)
+                    self.categories_loaded = True
+                    responses_received += 1
+            
+            # Check for products page response
+            if hasattr(self, 'products_request_id') and not hasattr(self, 'products_loaded'):
+                response = root.get_response(self.products_request_id)
+                if response:
+                    logger.debug(f"Received products page response")
+                    products_page = response.get('data', {})
+                    products = products_page.get('products', [])
+                    logger.debug(f"Displaying {len(products)} products")
+                    self.products_panel.display_products(products)
+                    
+                    # Update pagination
+                    logger.debug(f"Updating pagination: page {products_page.get('current_page')} of {products_page.get('total_pages')}")
+                    self.navigation_panel.set_page_info(
+                        products_page.get('current_page', 1),
+                        products_page.get('total_pages', 1)
+                    )
+                    self.products_loaded = True
+                    responses_received += 1
+            
+            if responses_received < 2:
+                # Not all responses ready yet, check again soon
+                logger.debug(f"Received {responses_received}/2 responses, checking again in 100ms")
+                self.after(100, self._check_initial_data_responses, root)
+            else:
+                logger.debug("All initial data responses received")
+            
+            logger.debug("EXIT: SalePage._check_initial_data_responses()")
+            
+        except Exception as e:
+            logger.error(f"Failed to check initial data responses: {str(e)}", exc_info=True)
 
     def _on_filter_change(self, filters):
         """Handle filter changes"""
@@ -237,43 +293,73 @@ class SalePage(tk.Frame):
             logger.error(f"Failed to handle page change: {str(e)}", exc_info=True)
 
     def _refresh_products(self):
-        """Refresh products based on current filters and page"""
+        """Refresh products based on current filters and page - asynchronously"""
         logger.debug("ENTRY: SalePage._refresh_products()")
         
         try:
-            if not self.data_processor:
-                logger.warning("Data processor not available")
-                return
+            # Get reference to main app for sending requests
+            root = self.winfo_toplevel()
+            if hasattr(root, 'send_request_to_processor'):
+                logger.debug(f"Sending filter request with criteria: {self.current_filters}")
+                
+                # Send filter request to data processor
+                self.filter_request_id = root.send_request_to_processor(
+                    action='filter_products',
+                    request_data={
+                        'category': self.current_filters.get('category'),
+                        'vendor': self.current_filters.get('vendor'),
+                        'search': self.current_filters.get('search')
+                    }
+                )
+                logger.debug(f"Sent filter request: {self.filter_request_id}")
+                
+                # Schedule checking for response
+                self.after(50, self._check_filter_response, root)
+            else:
+                logger.warning("Main app not available, cannot send filter request")
             
-            # Filter products
-            logger.debug(f"Filtering products with criteria: {self.current_filters}")
-            filtered = self.data_processor.filter_products(
-                category=self.current_filters.get('category'),
-                vendor=self.current_filters.get('vendor'),
-                search=self.current_filters.get('search')
-            )
-            logger.debug(f"Filtered results: {len(filtered)} products")
-            
-            # Calculate pagination for filtered results
-            items_per_page = 20
-            total = len(filtered)
-            total_pages = (total + items_per_page - 1) // items_per_page
-            self.current_page = max(1, min(self.current_page, total_pages))
-            logger.debug(f"Pagination: page {self.current_page} of {total_pages}")
-            
-            # Get page slice
-            start_idx = (self.current_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            page_products = filtered[start_idx:end_idx]
-            logger.debug(f"Displaying {len(page_products)} products for page {self.current_page}")
-            
-            # Update display
-            self.products_panel.display_products(page_products)
-            self.navigation_panel.set_page_info(self.current_page, total_pages)
             logger.debug("EXIT: SalePage._refresh_products()")
             
         except Exception as e:
             logger.error(f"Failed to refresh products: {str(e)}", exc_info=True)
+
+    def _check_filter_response(self, root):
+        """Check if filter response is ready and update display"""
+        logger.debug("ENTRY: SalePage._check_filter_response()")
+        
+        try:
+            if hasattr(self, 'filter_request_id'):
+                response = root.get_response(self.filter_request_id)
+                if response:
+                    logger.debug(f"Received filter response")
+                    filtered = response.get('data', [])
+                    logger.debug(f"Filtered results: {len(filtered)} products")
+                    
+                    # Calculate pagination for filtered results
+                    items_per_page = 20
+                    total = len(filtered)
+                    total_pages = (total + items_per_page - 1) // items_per_page
+                    self.current_page = max(1, min(self.current_page, total_pages))
+                    logger.debug(f"Pagination: page {self.current_page} of {total_pages}")
+                    
+                    # Get page slice
+                    start_idx = (self.current_page - 1) * items_per_page
+                    end_idx = start_idx + items_per_page
+                    page_products = filtered[start_idx:end_idx]
+                    logger.debug(f"Displaying {len(page_products)} products for page {self.current_page}")
+                    
+                    # Update display
+                    self.products_panel.display_products(page_products)
+                    self.navigation_panel.set_page_info(self.current_page, total_pages)
+                else:
+                    # Response not ready yet, check again
+                    logger.debug("Filter response not ready yet, checking again in 50ms")
+                    self.after(50, self._check_filter_response, root)
+            
+            logger.debug("EXIT: SalePage._check_filter_response()")
+            
+        except Exception as e:
+            logger.error(f"Failed to check filter response: {str(e)}", exc_info=True)
 
     def _on_product_click(self, product):
         """Handle product card click - add to order"""

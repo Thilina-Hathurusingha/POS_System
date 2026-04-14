@@ -11,6 +11,14 @@ def create_new_table(conn):
     cursor = conn.cursor()
 
     cursor.execute("""
+    CREATE TABLE IF NOT EXISTS category (
+        category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_name TEXT,
+    )
+    """)
+    conn.commit()
+
+    '''cursor.execute("""
     CREATE TABLE IF NOT EXISTS products (
         product_id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
@@ -29,7 +37,7 @@ def create_new_table(conn):
         active BOOLEAN
     )
     """)
-    conn.commit()
+    conn.commit()'''
 
 
 def migrate_data(old_conn, new_conn):
@@ -37,64 +45,26 @@ def migrate_data(old_conn, new_conn):
     old_cursor = old_conn.cursor()
     new_cursor = new_conn.cursor()
 
-    old_cursor.execute("SELECT * FROM products")
+    old_cursor.execute("SELECT * FROM category")
     rows = old_cursor.fetchall()
 
     for row in rows:
         (
-            item_code,
-            name,
-            description,
-            wp,
-            mrp,
-            discount_price,
-            stock,
-            batch_stock,
-            batch_id,
             category_id,
-            vendor_id,
-            image
+            name,
+            item_code,
+            category_code
         ) = row
 
-        # Handle NULLs safely
-        cost = wp if wp is not None else 0.0
-        total_in_stock = stock if stock is not None else 0
-        in_stock = batch_stock if batch_stock is not None else 0
 
         new_cursor.execute("""
-        INSERT INTO products (
-            name,
-            description,
-            cost,
-            mrp,
-            discount_price,
-            total_in_stock,
-            in_stock,
-            batch_id,
-            category_id,
-            vendor_id,
-            label1,
-            is_subproduct,
-            parent_product_id,
-            active
+        INSERT INTO category (
+            category_name
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?)
         """, (
-            name,
-            description,
-            cost,
-            mrp,
-            discount_price,
-            total_in_stock,
-            in_stock,
-            batch_id,
-            category_id,
-            vendor_id,
-            1,          # label1
-            0,          # is_subproduct (False)
-            0,          # parent_product_id
-            1           # active (True)
-        ))
+            name
+        ))  
 
     new_conn.commit()
 
