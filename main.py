@@ -6,9 +6,11 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 import queue
+import uuid
 from proessing.data_processor import DataProcessor
 from sale.sale_page import SalePage
 from log.logging_config import AppLogger, get_logger
+from shared.resource import event_queue, gui_request_event
 
 # ========== Initialize Logging ==========
 # Setup logging with default ERROR level
@@ -49,13 +51,11 @@ class MainApp(tk.Tk):
             logger.debug(f"Window initialized: {self.winfo_screenwidth()}x{self.winfo_screenheight()}")
             
             # ========== Background Thread for Data Processing ==========
-            # Create a queue to communicate between the background thread and GUI thread
-            # This prevents blocking the UI while processing data
+            # Use shared event_queue from resource.py for communication between threads
+            # This allows both GUI and data processor to access the same queue
             logger.debug("Setting up data processor thread...")
-            self.gui_queue = queue.Queue()
-            # Pass callback to enable thread-safe signaling from worker to GUI
-            # This allows GUI to be woken immediately when data is available
-            self.data_processor = DataProcessor(self.gui_queue, gui_callback=self._on_data_available)
+            # Pass callback to signal GUI when responses are ready
+            self.data_processor = DataProcessor(gui_callback=self._on_data_available)
             self.data_processor.start()  # Start the background thread
             logger.debug("Data processor thread started successfully")
             
@@ -260,6 +260,44 @@ class MainApp(tk.Tk):
         
         logger.debug("EXIT: MainApp._on_data_available()")
 
+    def send_request_to_processor(self, action, request_data=None):
+        """
+        Send a request to data processor and get response via event_queue.
+        GUI puts request in queue and signals the processor thread.
+        
+        Args:
+            action: Action to perform (e.g., 'get_products_page', 'filter_products')
+            request_data: Additional data for the request
+            
+        Returns:
+            Request ID that can be used to match responses
+        """
+        logger.debug(f"ENTRY: MainApp.send_request_to_processor(action={action})")
+        
+        try:
+            request_id = str(uuid.uuid4())
+            
+            request = {
+                'type': 'gui_request',
+                'action': action,
+                'request_id': request_id,
+                **(request_data or {})
+            }
+            
+            logger.debug(f"Putting request in queue: action={action}, request_id={request_id}")
+            event_queue.put(request)
+            
+            # Signal the data processor thread that a GUI request is ready
+            logger.debug("Signaling data processor thread about new request")
+            gui_request_event.set()
+            
+            logger.debug(f"EXIT: MainApp.send_request_to_processor() - request_id={request_id}")
+            return request_id
+            
+        except Exception as e:
+            logger.error(f"Failed to send request: {str(e)}", exc_info=True)
+            return None
+
     def _check_data_queue_immediate(self):
         """Check queue immediately (called from signal or polling)"""
         logger.debug("ENTRY: MainApp._check_data_queue_immediate()")
@@ -267,10 +305,26 @@ class MainApp(tk.Tk):
         try:
             processed_count = 0
             while True:
-                message = self.gui_queue.get_nowait()
-                # Handle messages from data processor if needed
-                logger.debug(f"Received message from data processor: {message.get('type', 'unknown')}")
+                message = event_queue.get_nowait()
+                
+                if message.get('type') == 'response':
+                    logger.debug(f"Received response from data processor: action={message.get('action')}, status={message.get('status')}")
+                    request_id = message.get('request_id')
+                    action = message.get('action')
+                    status = message.get('status')
+                    
+                    if status == 'success':
+                        logger.debug(f"Response successful for request {request_id}: {action}")
+                        # Handle response data based on action
+                        self._handle_processor_response(action, request_id, message)
+                    else:
+                        logger.warning(f"Response error for request {request_id}: {message.get('error')}")
+                
+                else:
+                    logger.debug(f"Received message from data processor: {message.get('type', 'unknown')}")
+                
                 processed_count += 1
+                
         except queue.Empty:
             if processed_count > 0:
                 logger.debug(f"Processed {processed_count} messages from queue")
@@ -278,6 +332,76 @@ class MainApp(tk.Tk):
             logger.error(f"Error checking data queue: {str(e)}", exc_info=True)
         
         logger.debug("EXIT: MainApp._check_data_queue_immediate()")
+
+    def _handle_processor_response(self, action, request_id, response):
+        """
+        Handle response from data processor based on action.
+        
+        Args:
+            action: The action that was requested
+            request_id: ID of the original request
+            response: Response message from processor
+        """
+        logger.debug(f"ENTRY: MainApp._handle_processor_response(action={action}, request_id={request_id})")
+        
+        try:
+            if action == 'get_products_page':
+                logger.debug(f"Handling products page response for request {request_id}")
+                # Store response for pages to retrieve
+                if not hasattr(self, '_pending_responses'):
+                    self._pending_responses = {}
+                self._pending_responses[request_id] = response
+                logger.debug(f"Response stored with key {request_id}")
+            
+            elif action == 'filter_products':
+                logger.debug(f"Handling filter products response for request {request_id}")
+                if not hasattr(self, '_pending_responses'):
+                    self._pending_responses = {}
+                self._pending_responses[request_id] = response
+                logger.debug(f"Response stored with key {request_id}")
+            
+            elif action == 'get_categories_vendors':
+                logger.debug(f"Handling categories/vendors response for request {request_id}")
+                if not hasattr(self, '_pending_responses'):
+                    self._pending_responses = {}
+                self._pending_responses[request_id] = response
+                logger.debug(f"Response stored with key {request_id}")
+            
+            else:
+                logger.warning(f"Unknown action in response: {action}")
+            
+            logger.debug(f"EXIT: MainApp._handle_processor_response()")
+            
+        except Exception as e:
+            logger.error(f"Failed to handle processor response: {str(e)}", exc_info=True)
+
+    def get_response(self, request_id):
+        """
+        Retrieve response for a specific request.
+        
+        Args:
+            request_id: ID of the request to retrieve response for
+            
+        Returns:
+            Response data or None if not yet available
+        """
+        logger.debug(f"ENTRY: MainApp.get_response(request_id={request_id})")
+        
+        try:
+            if not hasattr(self, '_pending_responses'):
+                self._pending_responses = {}
+            
+            response = self._pending_responses.pop(request_id, None)
+            if response:
+                logger.debug(f"Retrieved response for request {request_id}")
+            else:
+                logger.debug(f"No response yet for request {request_id}")
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to get response: {str(e)}", exc_info=True)
+            return None
 
     def _check_data_queue(self):
         """Periodic check for data from data processor (polling fallback)"""

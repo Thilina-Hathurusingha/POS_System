@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from log.logging_config import get_logger
+from shared.resource import event_queue, gui_request_event
 
 # ========== Initialize Logger ==========
 logger = get_logger(__name__)
@@ -28,13 +29,12 @@ class Product:
 class DataProcessor(threading.Thread):
     """Thread that processes data and sends updates to GUI via queue"""
 
-    def __init__(self, gui_queue: queue.Queue, gui_callback=None):
+    def __init__(self, gui_callback=None):
         """
         Initialize DataProcessor thread.
         
         Args:
-            gui_queue: Queue to send data updates to GUI thread
-            gui_callback: Optional callback function to signal GUI when data is available
+            gui_callback: Optional callback to signal GUI when response is ready
         """
         logger.debug("ENTRY: DataProcessor.__init__()")
         
@@ -42,14 +42,11 @@ class DataProcessor(threading.Thread):
             super().__init__(daemon=True)
             logger.debug("DataProcessor thread initialized as daemon thread")
             
-            self.gui_queue = gui_queue
-            logger.debug("GUI queue reference stored")
-            
             self.gui_callback = gui_callback
             if gui_callback:
-                logger.debug("GUI callback function registered for thread-safe signaling")
+                logger.debug("GUI callback function registered for sending responses to GUI")
             else:
-                logger.debug("No GUI callback provided - GUI will use polling")
+                logger.debug("No GUI callback provided")
             
             self.running = True
             logger.debug("Running flag set to True")
@@ -205,6 +202,136 @@ class DataProcessor(threading.Thread):
             logger.error(f"Failed to filter products: {str(e)}", exc_info=True)
             raise
 
+    def _handle_gui_request(self):
+        """
+        Process GUI requests from event_queue.
+        This is called by GUI thread via callback when a request is available.
+        """
+        logger.debug("ENTRY: DataProcessor._handle_gui_request()")
+        
+        try:
+            while True:
+                try:
+                    message = event_queue.get_nowait()
+                    
+                    if message.get('type') == 'gui_request':
+                        logger.debug(f"Processing GUI request: {message.get('action')}")
+                        action = message.get('action')
+                        request_id = message.get('request_id')
+                        
+                        # ========== Route Request to Appropriate Handler ==========
+                        if action == 'get_products_page':
+                            logger.debug("Handling get_products_page request")
+                            page = message.get('page', 1)
+                            items_per_page = message.get('items_per_page', 20)
+                            result = self.get_products_page(page, items_per_page)
+                            response = {
+                                'type': 'response',
+                                'action': action,
+                                'request_id': request_id,
+                                'status': 'success',
+                                'data': result
+                            }
+                            
+                        elif action == 'filter_products':
+                            logger.debug("Handling filter_products request")
+                            category = message.get('category')
+                            vendor = message.get('vendor')
+                            search = message.get('search')
+                            result = self.filter_products(category, vendor, search)
+                            response = {
+                                'type': 'response',
+                                'action': action,
+                                'request_id': request_id,
+                                'status': 'success',
+                                'data': result
+                            }
+                            
+                        elif action == 'get_categories_vendors':
+                            logger.debug("Handling get_categories_vendors request")
+                            response = {
+                                'type': 'response',
+                                'action': action,
+                                'request_id': request_id,
+                                'status': 'success',
+                                'categories': self.categories,
+                                'vendors': self.vendors
+                            }
+                            
+                        else:
+                            logger.warning(f"Unknown action requested: {action}")
+                            response = {
+                                'type': 'response',
+                                'action': action,
+                                'request_id': request_id,
+                                'status': 'error',
+                                'error': f'Unknown action: {action}'
+                            }
+                        
+                        # Put response back in queue
+                        logger.debug(f"Putting response in queue for request {request_id}")
+                        event_queue.put(response)
+                        
+                        # Signal GUI that response is ready
+                        if self.gui_callback:
+                            logger.debug("Signaling GUI that response is ready")
+                            self.gui_callback()
+                        
+                except queue.Empty:
+                    break
+                except Exception as e:
+                    logger.error(f"Error processing request: {str(e)}", exc_info=True)
+                    # Put error response in queue
+                    try:
+                        event_queue.put({
+                            'type': 'response',
+                            'status': 'error',
+                            'error': str(e)
+                        })
+                        if self.gui_callback:
+                            self.gui_callback()
+                    except:
+                        pass
+            
+            logger.debug("EXIT: DataProcessor._handle_gui_request()")
+            
+        except Exception as e:
+            logger.error(f"Critical error in request handler: {str(e)}", exc_info=True)
+
+    def run(self):
+        """
+        Main thread loop - waits for and processes GUI requests.
+        Runs in background thread and signals GUI when responses are ready.
+        """
+        logger.info("DataProcessor thread started")
+        logger.debug("ENTRY: DataProcessor.run()")
+        
+        try:
+            while self.running:
+                try:
+                    # Wait for gui_request_event with timeout to allow graceful shutdown
+                    logger.debug("Waiting for GUI requests...")
+                    gui_request_event.wait(timeout=1.0)
+                    
+                    if gui_request_event.is_set():
+                        logger.debug("GUI request event triggered")
+                        gui_request_event.clear()  # Reset event for next request
+                        
+                        # Process all pending requests from GUI
+                        self._handle_gui_request()
+                        
+                except Exception as e:
+                    logger.error(f"Error in request processing loop: {str(e)}", exc_info=True)
+                    time.sleep(0.1)
+            
+            logger.info("DataProcessor thread stopped")
+            logger.debug("EXIT: DataProcessor.run()")
+            
+        except Exception as e:
+            logger.error(f"Critical error in DataProcessor.run(): {str(e)}", exc_info=True)
+
+
+
 
     #For now we don't need this function
     def run(self):
@@ -231,8 +358,8 @@ class DataProcessor(threading.Thread):
                 }
                 
                 logger.debug(f"Putting message in queue: type={message['type']}")
-                self.gui_queue.put(message)
-                logger.debug(f"Message sent to GUI. Queue size: {self.gui_queue.qsize()}")
+                event_queue.put(message)
+                logger.debug(f"Message sent to GUI. Queue size: {event_queue.qsize()}")
                 
                 # ========== Signal GUI Thread ==========
                 # If callback is registered, call it to wake up GUI immediately
