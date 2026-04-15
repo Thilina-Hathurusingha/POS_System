@@ -3,27 +3,22 @@ Data Processor Thread - Handles backend data operations and dummy data feeds.
 This thread runs separately from the GUI thread and sends data via queue.
 """
 
+from dbm import sqlite3
+import sqlite3
 import threading
 import queue
 import time
-from dataclasses import dataclass
+#from dataclasses import dataclass
 from typing import List, Dict, Any
 from log.logging_config import get_logger
 from shared.resource import event_queue, gui_request_event
+from shared.data_struct import Category, Product, Vendor
 
 # ========== Initialize Logger ==========
 logger = get_logger(__name__)
 
+db_path = "database/POS_Data.db"  # Path to the SQLite database file
 
-@dataclass
-class Product:
-    """Product data structure"""
-    id: int
-    name: str
-    price: float
-    category: str
-    vendor: str
-    stock: int
 
 
 class DataProcessor(threading.Thread):
@@ -51,8 +46,9 @@ class DataProcessor(threading.Thread):
             self.running = True
             logger.debug("Running flag set to True")
             
+
             logger.debug("Initializing dummy data...")
-            self._init_dummy_data()
+            #self._init_dummy_data()
             logger.debug("Dummy data initialized")
             
             logger.debug("EXIT: DataProcessor.__init__() - Success")
@@ -70,23 +66,6 @@ class DataProcessor(threading.Thread):
             # Create a list of Product objects with realistic data
             # Each product has: id, name, price, category, vendor, and stock quantity
             logger.debug("Creating container for 15 sample products...")
-            self.products = [
-                Product(1, "Coca-Cola 500ml", 25.99, "Beverages", "Global Drinks", 50),
-                Product(2, "Pepsi 500ml", 25.99, "Beverages", "PepsiCo", 45),
-                Product(3, "Orange Juice 1L", 45.50, "Beverages", "Fresh Juice Co", 30),
-                Product(4, "Coffee Beans 500g", 299.99, "Coffee", "Mountain Blend", 20),
-                Product(5, "Espresso Machine", 15999.00, "Machines", "CoffeeArt", 5),
-                Product(6, "Tea Set 15 bags", 189.99, "Tea", "Premium Tea", 40),
-                Product(7, "Milk Chocolate Bar", 89.99, "Snacks", "Sweet Company", 100),
-                Product(8, "Almonds 250g", 349.99, "Snacks", "NutsPro", 25),
-                Product(9, "Whole Wheat Bread", 79.99, "Bakery", "Daily Bread", 35),
-                Product(10, "Croissant Pack", 199.99, "Bakery", "French Bakery", 15),
-                Product(11, "Greek Yogurt 500ml", 129.99, "Dairy", "Dairy Fresh", 50),
-                Product(12, "Butter 200g", 159.99, "Dairy", "Dairy Fresh", 40),
-                Product(13, "Olive Oil 500ml", 449.99, "Oils", "Premium Oils", 20),
-                Product(14, "Honey 500ml", 299.99, "Condiments", "Local Honey", 30),
-                Product(15, "Pasta 500g", 99.99, "Grains", "Italian Made", 60),
-            ]
             logger.debug(f"Created {len(self.products)} sample products")
             
             # ========== Extract Unique Categories and Vendors ==========
@@ -118,31 +97,24 @@ class DataProcessor(threading.Thread):
         logger.debug(f"ENTRY: DataProcessor.get_products_page(page={page}, items_per_page={items_per_page})")
         
         try:
-            # ========== Calculate Pagination ==========
-            # Determine total number of pages needed based on total products
-            total = len(self.products)
-            total_pages = (total + items_per_page - 1) // items_per_page  # Ceiling division
+            #limit calculation for SQL query
+            last_id = (page - 1) * items_per_page
+            logger.debug(f"Calculated last_id for pagination: {last_id}")
             
-            logger.debug(f"Total products: {total}, items per page: {items_per_page}, total pages: {total_pages}")
-            
-            # ========== Validate Page Number ==========
-            # Ensure page is within valid range (1 to total_pages)
-            original_page = page
-            page = max(1, min(page, total_pages))
-            if page != original_page:
-                logger.warning(f"Page number {original_page} out of range [1, {total_pages}]. Using page {page}")
-            
-            # ========== Calculate Slice Indices ==========
-            # Determine the starting and ending index for the current page
-            start_idx = (page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            
-            logger.debug(f"Page indices: {start_idx} to {end_idx}")
+
+            # Calculate total products and total pages for pagination metadata
+            self.cursor.execute("SELECT COUNT(*) FROM products")
+            total = self.cursor.fetchone()[0]
+            total_pages = (total + items_per_page - 1) // items_per_page
+            logger.debug(f"Total products in database: {total}")
+            logger.debug(f"Total pages calculated: {total_pages}")
+
+
             
             # ========== Return Paginated Data ==========
             # Return the products for this page plus pagination metadata
             result = {
-                "products": self.products[start_idx:end_idx],  # Products on current page
+                "products": self.products[last_id:last_id + items_per_page],  # Products on current page
                 "current_page": page,  # Current page number
                 "total_pages": total_pages,  # Total available pages
                 "total_items": total,  # Total number of products
@@ -317,6 +289,49 @@ class DataProcessor(threading.Thread):
         except Exception as e:
             logger.error(f"Critical error in request handler: {str(e)}", exc_info=True)
 
+    def _load_data(self):
+        """Load data from database (if needed)"""
+        logger.debug("ENTRY: DataProcessor.load_data()")
+        
+        try:
+            # Placeholder for any initial data loading if necessary
+            logger.debug("Load Category and Vendor data for filters...")
+
+            self.cursor.execute("""
+                SELECT category_id, category_name
+                FROM category
+                ORDER BY category_id
+            """)
+
+            rows =self. cursor.fetchall()
+            self.categories = [Category(row[0], row[1]) for row in rows]
+
+            self.cursor.execute("""
+                SELECT vendor_id, vendor_name
+                FROM vendor
+                ORDER BY vendor_id
+            """)
+
+            rows =self. cursor.fetchall()
+            self.vendors = [Vendor(row[0], row[1]) for row in rows]
+
+            #load the product data from the DB
+            self.cursor.execute("""
+                SELECT product_id, name, mrp, discount_price, total_in_stock, category_id, vendor_id
+                FROM products
+                ORDER BY product_id
+            """)
+
+            row = self.cursor.fetchall()
+            self.products = [Product(id=r[0], name=r[1], price=r[3], category=r[5], vendor=r[6], stock=r[4]) for r in row]
+
+            
+            logger.debug("EXIT: DataProcessor.load_data() - Success")
+            
+        except Exception as e:
+            logger.error(f"Failed to load data: {str(e)}", exc_info=True)
+            raise
+
     def run(self):
         """
         Main thread loop - waits for and processes GUI requests.
@@ -324,6 +339,16 @@ class DataProcessor(threading.Thread):
         """
         logger.info("DataProcessor thread started")
         logger.debug("ENTRY: DataProcessor.run()")
+
+        #connet with data base
+        self.conn = sqlite3.connect(db_path)
+        self.cursor = self.conn.cursor()
+
+        self.products = []  # List to hold current page of products
+        self.categories = []  # List of unique categories for filters
+        self.vendors = []  # List of unique vendors for filters 
+
+        self._load_data();
         
         try:
             while self.running:

@@ -220,6 +220,7 @@ class NavigationPanel(tk.Frame):
 
     def set_page_info(self, current_page, total_pages):
         """Set page information"""
+        logger.debug(f"Setting page info: current_page={current_page}, total_pages={total_pages}")
         self.current_page = current_page
         self.total_pages = total_pages
         self.update_pagination(total_pages)

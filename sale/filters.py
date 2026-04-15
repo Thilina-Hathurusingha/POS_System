@@ -199,8 +199,9 @@ class FilterPanel(tk.Frame):
     def update_categories(self, categories):
         """Update category dropdown options"""
         self.categories = categories
+
         if hasattr(self, "category_var_dropdown"):
-            values = ["All Categories"] + categories
+            values = ["All Categories"] + [cat.name for cat in categories]  # Assuming categories is a list of Category objects
             self.category_var_dropdown["values"] = values
             self.category_var_dropdown.set("All Categories")
 
@@ -208,6 +209,6 @@ class FilterPanel(tk.Frame):
         """Update vendor dropdown options"""
         self.vendors = vendors
         if hasattr(self, "vendor_var_dropdown"):
-            values = ["All Vendors"] + vendors
+            values = ["All Vendors"] + [vendor.name for vendor in vendors]  # Assuming vendors is a list of Vendor objects
             self.vendor_var_dropdown["values"] = values
             self.vendor_var_dropdown.set("All Vendors")
