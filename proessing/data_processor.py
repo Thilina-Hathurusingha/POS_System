@@ -11,7 +11,7 @@ import time
 #from dataclasses import dataclass
 from typing import List, Dict, Any
 from log.logging_config import get_logger
-from shared.resource import event_queue, gui_request_event
+import shared.resource as resource
 from shared.data_struct import Category, Product, Vendor
 
 # ========== Initialize Logger ==========
@@ -114,7 +114,7 @@ class DataProcessor(threading.Thread):
             # ========== Return Paginated Data ==========
             # Return the products for this page plus pagination metadata
             result = {
-                "products": self.products[last_id:last_id + items_per_page],  # Products on current page
+                "products": resource.products_details[last_id:last_id + items_per_page],  # Products on current page
                 "current_page": page,  # Current page number
                 "total_pages": total_pages,  # Total available pages
                 "total_items": total,  # Total number of products
@@ -143,7 +143,7 @@ class DataProcessor(threading.Thread):
         
         try:
             # Start with all products as the base result set
-            results = self.products
+            results = resource.products_details
             logger.debug(f"Starting with {len(results)} products")
             
             # ========== Filter by Category ==========
@@ -191,7 +191,7 @@ class DataProcessor(threading.Thread):
             
             while True:
                 try:
-                    message = event_queue.get_nowait()
+                    message = resource.event_queue.get_nowait()
                     
                     if message.get('type') == 'gui_request':
                         requests_to_process.append(message)
@@ -260,13 +260,13 @@ class DataProcessor(threading.Thread):
                     
                     # Put response in queue
                     logger.debug(f"Putting response in queue for request {request_id}")
-                    event_queue.put(response)
+                    resource.event_queue.put(response)
                     
                 except Exception as e:
                     logger.error(f"Error processing request: {str(e)}", exc_info=True)
                     # Put error response in queue
                     try:
-                        event_queue.put({
+                        resource.resource.event_queue.put({
                             'type': 'response',
                             'request_id': message.get('request_id'),
                             'status': 'error',
@@ -277,7 +277,7 @@ class DataProcessor(threading.Thread):
             
             # Requeue any non-request messages (like responses)
             for msg in messages_to_requeue:
-                event_queue.put(msg)
+                resource.event_queue.put(msg)
             
             # Signal GUI that processing complete and responses are ready
             if self.gui_callback and len(requests_to_process) > 0:
@@ -323,7 +323,7 @@ class DataProcessor(threading.Thread):
             """)
 
             row = self.cursor.fetchall()
-            self.products = [Product(id=r[0], name=r[1], price=r[3], category=r[5], vendor=r[6], stock=r[4]) for r in row]
+            resource.products_details = [Product(id=r[0], name=r[1], price=r[3], category=r[5], vendor=r[6], stock=r[4]) for r in row]
 
             
             logger.debug("EXIT: DataProcessor.load_data() - Success")
@@ -344,7 +344,6 @@ class DataProcessor(threading.Thread):
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
 
-        self.products = []  # List to hold current page of products
         self.categories = []  # List of unique categories for filters
         self.vendors = []  # List of unique vendors for filters 
 
@@ -355,11 +354,11 @@ class DataProcessor(threading.Thread):
                 try:
                     # Wait for gui_request_event with timeout to allow graceful shutdown
                     logger.debug("Waiting for GUI requests...")
-                    gui_request_event.wait(timeout=1.0)
+                    resource.gui_request_event.wait(timeout=1.0)
                     
-                    if gui_request_event.is_set():
+                    if resource.gui_request_event.is_set():
                         logger.debug("GUI request event triggered")
-                        gui_request_event.clear()  # Reset event for next request
+                        resource.gui_request_event.clear()  # Reset event for next request
                         
                         # Process all pending requests from GUI
                         self._handle_gui_request()

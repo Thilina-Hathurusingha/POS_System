@@ -10,6 +10,8 @@ from sale.navigation import NavigationPanel
 from sale.table import OrderTablePanel
 from sale.checkout import CheckoutPanel
 from log.logging_config import get_logger
+import shared.resource as resource
+import shared.configuration as config
 
 # ========== Initialize Logger ==========
 logger = get_logger(__name__)
@@ -195,7 +197,7 @@ class SalePage(tk.Frame):
                 # Request 2: Get first page of products
                 self.products_request_id = root.send_request_to_processor(
                     action='get_products_page',
-                    request_data={'page': 1, 'items_per_page': 20}
+                    request_data={'page': 1, 'items_per_page': config.items_per_page}
                 )
                 logger.debug(f"Sent products page request: {self.products_request_id}")
                 
@@ -286,7 +288,13 @@ class SalePage(tk.Frame):
         try:
             self.current_page = page_num
             logger.debug(f"Changed to page {page_num}")
-            self._refresh_products()
+            
+            start_point = config.items_per_page * (page_num - 1)
+            logger.debug(f"Calculating page slice: start={start_point}, end={start_point + config.items_per_page}")
+            products = resource.products_details[start_point:start_point + config.items_per_page]
+            logger.debug(f"Displaying {len(products)} products")
+            self.products_panel.display_products(products)
+
             logger.debug("EXIT: SalePage._on_page_change()")
             
         except Exception as e:
@@ -297,6 +305,12 @@ class SalePage(tk.Frame):
         logger.debug("ENTRY: SalePage._refresh_products()")
         
         try:
+
+            
+
+
+            #TODO Remove this
+            '''
             # Get reference to main app for sending requests
             root = self.winfo_toplevel()
             if hasattr(root, 'send_request_to_processor'):
@@ -319,6 +333,7 @@ class SalePage(tk.Frame):
                 logger.warning("Main app not available, cannot send filter request")
             
             logger.debug("EXIT: SalePage._refresh_products()")
+            '''
             
         except Exception as e:
             logger.error(f"Failed to refresh products: {str(e)}", exc_info=True)
