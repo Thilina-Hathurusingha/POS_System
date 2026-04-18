@@ -423,7 +423,7 @@ class SalePage(tk.Frame):
         """Handle settings button click"""
         logger.debug(f"ENTRY: SalePage._on_item_settings(product_id={product_id})")
         logger.debug(f"Settings clicked for item {product_id}")
-        messageBox.showinfo("Settings", f"Settings for item {product_id}\n(Placeholder functionality)")
+        messagebox.showinfo("Settings", f"Settings for item {product_id}\n(Placeholder functionality)")
         logger.debug("EXIT: SalePage._on_item_settings()")
 
     def _update_order_totals(self):

@@ -140,6 +140,8 @@ class OrderTablePanel(tk.Frame):
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        self.tree.bind("<Button-1>", self._on_tree_click)
+
     def add_item(self, product):
         """
         Add item to order table.
@@ -259,26 +261,31 @@ class OrderTablePanel(tk.Frame):
 
     def _on_tree_click(self, event):
         """Handle tree click for action buttons"""
-        item = self.tree.identify('item', event.x, event.y)
-        col = self.tree.identify_column(event.x, event.y)
-        
-        if item and col == "#5":  # Actions column
-            # Find which product this is
-            for product_id, item_data in self.items.items():
-                if item_data['row_id'] == item:
-                    # Determine if settings or delete
-                    col_width = self.tree.column("#5", 'width')
-                    col_x = self.tree.bbox(item, "#5")[0]
-                    click_x = event.x - col_x
-                    
-                    if click_x < col_width * 0.5:
-                        # Settings button
-                        if self.on_settings:
-                            self.on_settings(product_id)
-                    else:
-                        # Delete button
-                        self.remove_item(product_id)
-                    break
+        item = self.tree.identify_row(event.y)
+        col = self.tree.identify_column(event.x)
+
+        if not item or col != "#5":
+            return
+
+        bbox = self.tree.bbox(item, col)
+        if not bbox:
+            return
+
+        x_offset = event.x - bbox[0]
+        width = bbox[2]
+
+        # ✅ More reliable split (40% / 60%)
+        is_settings = x_offset < width * 0.45
+
+        for product_id, item_data in self.items.items():
+            if item_data['row_id'] == item:
+                if is_settings:				 
+                    if self.on_settings:
+                        self.on_settings(product_id)
+                else:
+									   
+                    self.remove_item(product_id)
+                break
 
     def get_total_amount(self):
         """
