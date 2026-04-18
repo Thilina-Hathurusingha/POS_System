@@ -46,10 +46,6 @@ class DataProcessor(threading.Thread):
             self.running = True
             logger.debug("Running flag set to True")
             
-
-            logger.debug("Initializing dummy data...")
-            #self._init_dummy_data()
-            logger.debug("Dummy data initialized")
             
             logger.debug("EXIT: DataProcessor.__init__() - Success")
             
@@ -57,31 +53,6 @@ class DataProcessor(threading.Thread):
             logger.error(f"Failed to initialize DataProcessor: {str(e)}", exc_info=True)
             raise
 
-    def _init_dummy_data(self):
-        """Initialize dummy product data"""
-        logger.debug("ENTRY: DataProcessor._init_dummy_data()")
-        
-        try:
-            # ========== Sample Product Data ==========
-            # Create a list of Product objects with realistic data
-            # Each product has: id, name, price, category, vendor, and stock quantity
-            logger.debug("Creating container for 15 sample products...")
-            logger.debug(f"Created {len(self.products)} sample products")
-            
-            # ========== Extract Unique Categories and Vendors ==========
-            # Extract all unique categories and vendors from products, then sort alphabetically
-            # This data is used to populate filter dropdown menus
-            logger.debug("Extracting unique categories and vendors...")
-            self.categories = sorted(set(p.category for p in self.products))
-            self.vendors = sorted(set(p.vendor for p in self.products))
-            
-            logger.debug(f"Extracted {len(self.categories)} categories: {self.categories}")
-            logger.debug(f"Extracted {len(self.vendors)} vendors: {self.vendors}")
-            logger.debug("EXIT: DataProcessor._init_dummy_data() - Success")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize dummy data: {str(e)}", exc_info=True)
-            raise
 
     def get_products_page(self, page: int = 1, items_per_page: int = 20) -> Dict[str, Any]:
         """
@@ -114,13 +85,13 @@ class DataProcessor(threading.Thread):
             # ========== Return Paginated Data ==========
             # Return the products for this page plus pagination metadata
             result = {
-                "products": resource.products_details[last_id:last_id + items_per_page],  # Products on current page
+                #"products": resource.products_details[last_id:last_id + items_per_page],  # Products on current page
                 "current_page": page,  # Current page number
                 "total_pages": total_pages,  # Total available pages
                 "total_items": total,  # Total number of products
             }
             
-            logger.debug(f"EXIT: DataProcessor.get_products_page() - Returning {len(result['products'])} products")
+            logger.debug(f"EXIT: DataProcessor.get_products_page() - Returning pagination info")
             return result
             
         except Exception as e:
@@ -174,7 +145,7 @@ class DataProcessor(threading.Thread):
             logger.error(f"Failed to filter products: {str(e)}", exc_info=True)
             raise
 
-    def _handle_gui_request(self):
+    def _handle_gui_request(self, message):
         """
         Process GUI requests from event_queue.
         This is called from run() loop after gui_request_event is signaled.
@@ -189,18 +160,18 @@ class DataProcessor(threading.Thread):
             requests_to_process = []
             messages_to_requeue = []
             
-            while True:
-                try:
-                    message = resource.event_queue.get_nowait()
+
+
+            #message = resource.event_queue.get_nowait()
+            logger.debug(message)
+            
+            if message.get('type') == 'gui_request':
+                requests_to_process.append(message)
+            else:
+                # Put non-request messages back for GUI to handle
+                messages_to_requeue.append(message)
                     
-                    if message.get('type') == 'gui_request':
-                        requests_to_process.append(message)
-                    else:
-                        # Put non-request messages back for GUI to handle
-                        messages_to_requeue.append(message)
-                        
-                except queue.Empty:
-                    break
+
             
             # Process all collected requests
             for message in requests_to_process:
@@ -210,8 +181,8 @@ class DataProcessor(threading.Thread):
                     logger.debug(f"Processing GUI request: {action}")
                     
                     # ========== Route Request to Appropriate Handler ==========
-                    if action == 'get_products_page':
-                        logger.debug("Handling get_products_page request")
+                    if action == 'refresh_products_page':
+                        logger.debug("Handling refresh_products_page request")
                         page = message.get('page', 1)
                         items_per_page = message.get('items_per_page', 20)
                         result = self.get_products_page(page, items_per_page)
@@ -260,7 +231,7 @@ class DataProcessor(threading.Thread):
                     
                     # Put response in queue
                     logger.debug(f"Putting response in queue for request {request_id}")
-                    resource.event_queue.put(response)
+                    resource.background_event_queue.put(response)
                     
                 except Exception as e:
                     logger.error(f"Error processing request: {str(e)}", exc_info=True)
@@ -277,7 +248,7 @@ class DataProcessor(threading.Thread):
             
             # Requeue any non-request messages (like responses)
             for msg in messages_to_requeue:
-                resource.event_queue.put(msg)
+                resource.GUI_event_queue.put(msg)
             
             # Signal GUI that processing complete and responses are ready
             if self.gui_callback and len(requests_to_process) > 0:
@@ -289,7 +260,7 @@ class DataProcessor(threading.Thread):
         except Exception as e:
             logger.error(f"Critical error in request handler: {str(e)}", exc_info=True)
 
-    def _load_data(self):
+    def _initilized_data(self):
         """Load data from database (if needed)"""
         logger.debug("ENTRY: DataProcessor.load_data()")
         
@@ -304,7 +275,7 @@ class DataProcessor(threading.Thread):
             """)
 
             rows =self. cursor.fetchall()
-            self.categories = [Category(row[0], row[1]) for row in rows]
+            resource.category_details = [Category(row[0], row[1]) for row in rows]
 
             self.cursor.execute("""
                 SELECT vendor_id, vendor_name
@@ -313,7 +284,7 @@ class DataProcessor(threading.Thread):
             """)
 
             rows =self. cursor.fetchall()
-            self.vendors = [Vendor(row[0], row[1]) for row in rows]
+            resource.vendor_details = [Vendor(row[0], row[1]) for row in rows]
 
             #load the product data from the DB
             self.cursor.execute("""
@@ -347,22 +318,17 @@ class DataProcessor(threading.Thread):
         self.categories = []  # List of unique categories for filters
         self.vendors = []  # List of unique vendors for filters 
 
-        self._load_data();
+        self._initilized_data();
         
         try:
             while self.running:
                 try:
-                    # Wait for gui_request_event with timeout to allow graceful shutdown
+
                     logger.debug("Waiting for GUI requests...")
-                    resource.gui_request_event.wait(timeout=1.0)
-                    
-                    if resource.gui_request_event.is_set():
-                        logger.debug("GUI request event triggered")
-                        resource.gui_request_event.clear()  # Reset event for next request
-                        
-                        # Process all pending requests from GUI
-                        self._handle_gui_request()
-                        
+                    message = resource.GUI_event_queue.get()
+                    logger.debug("GUI request received  from queue")
+                    self._handle_gui_request(message)
+
                 except Exception as e:
                     logger.error(f"Error in request processing loop: {str(e)}", exc_info=True)
                     time.sleep(0.1)

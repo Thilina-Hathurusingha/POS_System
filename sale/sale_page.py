@@ -55,7 +55,7 @@ class SalePage(tk.Frame):
             self.current_filters = {}
             # Track asynchronous request IDs
             self.categories_request_id = None
-            self.products_request_id = None
+            self.refresh_products_page_request_id = None
             self.filter_request_id = None
             logger.debug("State variables initialized")
             
@@ -195,11 +195,11 @@ class SalePage(tk.Frame):
                 logger.debug(f"Sent categories/vendors request: {self.categories_request_id}")
                 
                 # Request 2: Get first page of products
-                self.products_request_id = root.send_request_to_processor(
-                    action='get_products_page',
+                self.refresh_products_page_request_id = root.send_request_to_processor(
+                    action='refresh_products_page',
                     request_data={'page': 1, 'items_per_page': config.items_per_page}
                 )
-                logger.debug(f"Sent products page request: {self.products_request_id}")
+                logger.debug(f"Sent products page request: {self.refresh_products_page_request_id}")
                 
                 # Schedule checking for responses (non-blocking)
                 self.after(100, self._check_initial_data_responses, root)
@@ -232,14 +232,22 @@ class SalePage(tk.Frame):
                     responses_received += 1
             
             # Check for products page response
-            if hasattr(self, 'products_request_id') and not hasattr(self, 'products_loaded'):
-                response = root.get_response(self.products_request_id)
+            if hasattr(self, 'refresh_products_page_request_id') and not hasattr(self, 'products_loaded'):
+                response = root.get_response(self.refresh_products_page_request_id)
                 if response:
                     logger.debug(f"Received products page response")
                     products_page = response.get('data', {})
-                    products = products_page.get('products', [])
+
+                    #get the product to display
+                    start_point = config.items_per_page * (self.current_page - 1)
+                    logger.debug(f"Calculating page slice: start={start_point}, end={start_point + config.items_per_page}")
+                    products = resource.products_details[start_point:start_point + config.items_per_page]
                     logger.debug(f"Displaying {len(products)} products")
                     self.products_panel.display_products(products)
+
+                    #products = products_page.get('products', [])
+                    #logger.debug(f"Displaying {len(products)} products")
+                    #self.products_panel.display_products(products)
                     
                     # Update pagination
                     logger.debug(f"Updating pagination: page {products_page.get('current_page')} of {products_page.get('total_pages')}")

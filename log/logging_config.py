@@ -6,6 +6,7 @@ Supports colored output for better readability
 
 import logging
 import sys
+import os
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
@@ -13,6 +14,27 @@ from datetime import datetime
 LOG_LEVEL_ERROR = "ERROR"
 LOG_LEVEL_WARNING = "WARNING"
 LOG_LEVEL_DEBUG = "DEBUG"
+
+# ========== Log File Cleanup Function ==========
+def clear_log_file(log_file_path):
+    """
+    Clear/truncate a log file and its backup files when program starts
+    
+    Args:
+        log_file_path: Path to the log file to clear
+    """
+    try:
+        # Clear the main log file
+        if os.path.exists(log_file_path):
+            open(log_file_path, 'w').close()
+        
+        # Clear backup files (e.g., app.log.1, app.log.2, etc.)
+        for i in range(1, 6):  # Clear backups 1-5
+            backup_file = f"{log_file_path}.{i}"
+            if os.path.exists(backup_file):
+                os.remove(backup_file)
+    except Exception as e:
+        print(f"Warning: Could not clear log file {log_file_path}: {e}")
 
 # ========== Color Codes for Terminal Output ==========
 class ColorCodes:
@@ -63,6 +85,16 @@ class AppLogger:
     _initialized = False
     
     @classmethod
+    def clear_all_logs(cls):
+        """
+        Clear all log files (both pos.log and app.log) at program startup
+        This prevents log files from growing too large
+        """
+        log_files = ['log/pos.log', 'log/app.log']
+        for log_file in log_files:
+            clear_log_file(log_file)
+    
+    @classmethod
     def setup(cls, log_level=LOG_LEVEL_ERROR, log_file=None):
         """
         Setup logging configuration for the application
@@ -110,6 +142,9 @@ class AppLogger:
         # ========== File Handler (Optional) ==========
         if log_file:
             try:
+                # Clear log file and backups when program starts
+                clear_log_file(log_file)
+                
                 file_handler = RotatingFileHandler(
                     log_file,
                     maxBytes=5*1024*1024,  # 5 MB max file size

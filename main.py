@@ -10,7 +10,7 @@ import uuid
 from proessing.data_processor import DataProcessor
 from sale.sale_page import SalePage
 from log.logging_config import AppLogger, get_logger
-from shared.resource import event_queue, gui_request_event
+import shared.resource as resource
 
 # ========== Initialize Logging ==========
 # Setup logging with default ERROR level
@@ -285,11 +285,8 @@ class MainApp(tk.Tk):
             }
             
             logger.debug(f"Putting request in queue: action={action}, request_id={request_id}")
-            event_queue.put(request)
+            resource.GUI_event_queue.put(request)
             
-            # Signal the data processor thread that a GUI request is ready
-            logger.debug("Signaling data processor thread about new request")
-            gui_request_event.set()
             
             logger.debug(f"EXIT: MainApp.send_request_to_processor() - request_id={request_id}")
             return request_id
@@ -305,7 +302,7 @@ class MainApp(tk.Tk):
         try:
             processed_count = 0
             while True:
-                message = event_queue.get_nowait()
+                message = resource.background_event_queue.get_nowait()
                 
                 if message.get('type') == 'response':
                     logger.debug(f"Received response from data processor: action={message.get('action')}, status={message.get('status')}")
@@ -345,7 +342,7 @@ class MainApp(tk.Tk):
         logger.debug(f"ENTRY: MainApp._handle_processor_response(action={action}, request_id={request_id})")
         
         try:
-            if action == 'get_products_page':
+            if action == 'refresh_products_page':
                 logger.debug(f"Handling products page response for request {request_id}")
                 # Store response for pages to retrieve
                 if not hasattr(self, '_pending_responses'):
@@ -440,6 +437,9 @@ class MainApp(tk.Tk):
 
 def main():
     """Main entry point"""
+    # Clear all log files at program startup to prevent them from growing too large
+    AppLogger.clear_all_logs()
+    
     logger.debug("=" * 50)
     logger.debug("ENTRY: main()")
     logger.info("Starting POS System Application...")
