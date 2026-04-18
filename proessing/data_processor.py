@@ -292,13 +292,13 @@ class DataProcessor(threading.Thread):
 
             #load the product data from the DB
             self.cursor.execute("""
-                SELECT product_id, name, mrp, discount_price, total_in_stock, category_id, vendor_id
+                SELECT product_id, name, mrp, discount_price, total_in_stock, category_id, vendor_id, description
                 FROM products
                 ORDER BY product_id
             """)
 
             row = self.cursor.fetchall()
-            resource.products_details = [Product(id=r[0], name=r[1], price=r[3], category=r[5], vendor=r[6], stock=r[4]) for r in row]
+            resource.products_details = [Product(id=r[0], name=r[1], description=r[7], price=r[3], category=r[5], vendor=r[6], stock=r[4]) for r in row]
 
             
             logger.debug("EXIT: DataProcessor.load_data() - Success")

@@ -2,6 +2,7 @@
 Sale Page - Full-screen sales interface with product grid, filters, and checkout.
 """
 
+from ast import keyword
 import tkinter as tk
 from tkinter import messagebox
 from sale.filters import FilterPanel
@@ -287,6 +288,14 @@ class SalePage(tk.Frame):
             #get serach filter
             #TODO need to implimnet
             search_filter = filters["search"]
+            if search_filter:
+                logger.debug(f"Search filter applied: '{search_filter}'")
+                self.filter_on = True
+                search_filter = search_filter.lower()
+                self.filter_products_details = [ p for p in self.filter_products_details 
+                        if search_filter in p.name.lower() or 
+                        search_filter in (p.description or "").lower()
+                ]
 
 
             #refresh page

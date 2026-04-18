@@ -5,6 +5,7 @@ class Product:
     """Product data structure"""
     id: int
     name: str
+    description: str
     price: float
     category: int
     vendor: int
