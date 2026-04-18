@@ -53,10 +53,13 @@ class SalePage(tk.Frame):
             self.current_page = 1
             # Store active filter criteria (category, vendor, search)
             self.current_filters = {}
+            self.filter_on = False
+            self.filter_products_details = []
             # Track asynchronous request IDs
             self.categories_request_id = None
             self.refresh_products_page_request_id = None
             self.filter_request_id = None
+            
             logger.debug("State variables initialized")
             
             # ========== Build UI and Load Data ==========
@@ -188,13 +191,8 @@ class SalePage(tk.Frame):
             if hasattr(root, 'send_request_to_processor'):
                 logger.debug("Sending requests for categories, vendors, and products to data processor...")
                 
-                # Request 1: Get categories and vendors
-                self.categories_request_id = root.send_request_to_processor(
-                    action='get_categories_vendors'
-                )
-                logger.debug(f"Sent categories/vendors request: {self.categories_request_id}")
                 
-                # Request 2: Get first page of products
+                # Request refresh the products details
                 self.refresh_products_page_request_id = root.send_request_to_processor(
                     action='refresh_products_page',
                     request_data={'page': 1, 'items_per_page': config.items_per_page}
@@ -202,7 +200,7 @@ class SalePage(tk.Frame):
                 logger.debug(f"Sent products page request: {self.refresh_products_page_request_id}")
                 
                 # Schedule checking for responses (non-blocking)
-                self.after(100, self._check_initial_data_responses, root)
+                self.after(100, self._check_responses, root)
             else:
                 logger.warning("Main app not available, cannot send requests")
             
@@ -211,25 +209,11 @@ class SalePage(tk.Frame):
         except Exception as e:
             logger.error(f"Failed to load initial data: {str(e)}", exc_info=True)
 
-    def _check_initial_data_responses(self, root):
+    def _check_responses(self, root):
         """Check if initial data responses are ready"""
         logger.debug("ENTRY: SalePage._check_initial_data_responses()")
         
         try:
-            responses_received = 0
-            
-            # Check for categories/vendors response
-            if hasattr(self, 'categories_request_id') and not hasattr(self, 'categories_loaded'):
-                response = root.get_response(self.categories_request_id)
-                if response:
-                    logger.debug(f"Received categories/vendors response")
-                    categories = response.get('categories', [])
-                    vendors = response.get('vendors', [])
-                    logger.debug(f"Updating filter dropdowns with {len(categories)} categories and {len(vendors)} vendors")
-                    self.filter_panel.update_categories(categories)
-                    self.filter_panel.update_vendors(vendors)
-                    self.categories_loaded = True
-                    responses_received += 1
             
             # Check for products page response
             if hasattr(self, 'refresh_products_page_request_id') and not hasattr(self, 'products_loaded'):
@@ -237,17 +221,20 @@ class SalePage(tk.Frame):
                 if response:
                     logger.debug(f"Received products page response")
                     products_page = response.get('data', {})
+                    
+                    self.filter_products_details = [p for p in resource.products_details]
 
-                    #get the product to display
+                    #update the product to display
                     start_point = config.items_per_page * (self.current_page - 1)
                     logger.debug(f"Calculating page slice: start={start_point}, end={start_point + config.items_per_page}")
-                    products = resource.products_details[start_point:start_point + config.items_per_page]
+                    products = self.filter_products_details[start_point:start_point + config.items_per_page]
                     logger.debug(f"Displaying {len(products)} products")
                     self.products_panel.display_products(products)
 
-                    #products = products_page.get('products', [])
-                    #logger.debug(f"Displaying {len(products)} products")
-                    #self.products_panel.display_products(products)
+                    #update category and vendor lists for filters
+                    self.filter_panel.update_categories(resource.category_details)
+                    self.filter_panel.update_vendors(resource.vendor_details)
+
                     
                     # Update pagination
                     logger.debug(f"Updating pagination: page {products_page.get('current_page')} of {products_page.get('total_pages')}")
@@ -256,14 +243,6 @@ class SalePage(tk.Frame):
                         products_page.get('total_pages', 1)
                     )
                     self.products_loaded = True
-                    responses_received += 1
-            
-            if responses_received < 2:
-                # Not all responses ready yet, check again soon
-                logger.debug(f"Received {responses_received}/2 responses, checking again in 100ms")
-                self.after(100, self._check_initial_data_responses, root)
-            else:
-                logger.debug("All initial data responses received")
             
             logger.debug("EXIT: SalePage._check_initial_data_responses()")
             
@@ -272,7 +251,10 @@ class SalePage(tk.Frame):
 
     def _on_filter_change(self, filters):
         """Handle filter changes"""
-        logger.debug(f"ENTRY: SalePage._on_filter_change(filters={filters})")
+        logger.error(f"ENTRY: SalePage._on_filter_change(filters={filters})")
+
+        self.filter_on = False
+        self.filter_products_details = [p for p in resource.products_details]
         
         try:
             if not hasattr(self, 'products_panel'):
@@ -282,8 +264,50 @@ class SalePage(tk.Frame):
             self.current_filters = filters
             logger.debug(f"Filters updated: {filters}")
             self.current_page = 1
-            logger.debug("Reset to page 1")
-            self._refresh_products()
+
+            #get the vendor filter
+            vendor_filter_id = filters["vendor"].get("id") if filters["vendor"] else None
+            if vendor_filter_id:
+                logger.debug(f"Vendor filter selected: {filters['vendor'].get('name')} (ID: {vendor_filter_id})")
+                self.filter_on = True
+                self.filter_products_details = [
+                    p for p in self.filter_products_details if p.vendor == vendor_filter_id
+                ]
+
+            #get the category filter
+            category_filter_id = filters["category"].get("id") if filters["category"] else None
+            if category_filter_id:
+                logger.debug(f"Category filter selected: {filters['category'].get('name')} (ID: {category_filter_id})")
+                self.filter_on = True
+                self.filter_products_details = [
+                    p for p in self.filter_products_details if p.category == category_filter_id 
+                ]
+
+
+            #get serach filter
+            #TODO need to implimnet
+            search_filter = filters["search"]
+
+
+            #refresh page
+            logger.error(f"Total products after filtering: {len(self.filter_products_details)}")
+            start_point = config.items_per_page * (self.current_page - 1)
+            logger.debug(f"Calculating page slice: start={start_point}, end={start_point + config.items_per_page}")
+            products = self.filter_products_details[start_point:start_point + config.items_per_page]
+            logger.debug(f"Displaying {len(products)} products")
+            self.products_panel.display_products(products)
+
+
+            # Update pagination
+            total_pages = (len(self.filter_products_details) + config.items_per_page - 1) // config.items_per_page
+
+            logger.debug(f"Updating pagination")
+            self.navigation_panel.set_page_info(
+                self.current_page,
+                total_pages
+            )
+
+
             logger.debug("EXIT: SalePage._on_filter_change()")
             
         except Exception as e:
@@ -299,7 +323,7 @@ class SalePage(tk.Frame):
             
             start_point = config.items_per_page * (page_num - 1)
             logger.debug(f"Calculating page slice: start={start_point}, end={start_point + config.items_per_page}")
-            products = resource.products_details[start_point:start_point + config.items_per_page]
+            products = self.filter_products_details[start_point:start_point + config.items_per_page]
             logger.debug(f"Displaying {len(products)} products")
             self.products_panel.display_products(products)
 
@@ -307,44 +331,6 @@ class SalePage(tk.Frame):
             
         except Exception as e:
             logger.error(f"Failed to handle page change: {str(e)}", exc_info=True)
-
-    def _refresh_products(self):
-        """Refresh products based on current filters and page - asynchronously"""
-        logger.debug("ENTRY: SalePage._refresh_products()")
-        
-        try:
-
-            
-
-
-            #TODO Remove this
-            '''
-            # Get reference to main app for sending requests
-            root = self.winfo_toplevel()
-            if hasattr(root, 'send_request_to_processor'):
-                logger.debug(f"Sending filter request with criteria: {self.current_filters}")
-                
-                # Send filter request to data processor
-                self.filter_request_id = root.send_request_to_processor(
-                    action='filter_products',
-                    request_data={
-                        'category': self.current_filters.get('category'),
-                        'vendor': self.current_filters.get('vendor'),
-                        'search': self.current_filters.get('search')
-                    }
-                )
-                logger.debug(f"Sent filter request: {self.filter_request_id}")
-                
-                # Schedule checking for response
-                self.after(50, self._check_filter_response, root)
-            else:
-                logger.warning("Main app not available, cannot send filter request")
-            
-            logger.debug("EXIT: SalePage._refresh_products()")
-            '''
-            
-        except Exception as e:
-            logger.error(f"Failed to refresh products: {str(e)}", exc_info=True)
 
     def _check_filter_response(self, root):
         """Check if filter response is ready and update display"""

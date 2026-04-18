@@ -1,0 +1,34 @@
+
+##### Shared Resource
+
+	#Queue
+	- GUI_event_queue			-> Gui put the request
+	- background_event_queue	-> BG put the respose
+	
+	#Variables
+	- products_details
+	- category_details
+	- vendor_details
+	
+	
+##### Interface
+
+GUI callback -> _on_data_available
+BG thread -> main loop wait for request in GUI_event_queue
+
+##### Request Paramters
+
+'type'			: <String type request code>,
+'action'		: <action>				-> can be add more action in future
+'request_id'	: <Unit id for each request. use to detect response>
+**(request_data or {})	-> unit paramter for given request
+
+##### Request API
+
+send_request_to_processor(self, action, request_data=None) -> main.py
+
+##### GUI Request List
+
+	# Sale_page.py
+	- refresh_products_page -> refrech the products_details, category_details, vendor_details
+	- 

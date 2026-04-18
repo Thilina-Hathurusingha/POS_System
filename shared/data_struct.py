@@ -6,8 +6,8 @@ class Product:
     id: int
     name: str
     price: float
-    category: str
-    vendor: str
+    category: int
+    vendor: int
     stock: int
 
 @dataclass

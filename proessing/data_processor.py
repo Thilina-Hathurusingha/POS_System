@@ -54,7 +54,7 @@ class DataProcessor(threading.Thread):
             raise
 
 
-    def get_products_page(self, page: int = 1, items_per_page: int = 20) -> Dict[str, Any]:
+    def refrech_products_details(self, page: int = 1, items_per_page: int = 20) -> Dict[str, Any]:
         """
         Get products for a specific page.
         
@@ -68,6 +68,10 @@ class DataProcessor(threading.Thread):
         logger.debug(f"ENTRY: DataProcessor.get_products_page(page={page}, items_per_page={items_per_page})")
         
         try:
+
+            #reload the product details from the DB
+            self._initialized_data()
+
             #limit calculation for SQL query
             last_id = (page - 1) * items_per_page
             logger.debug(f"Calculated last_id for pagination: {last_id}")
@@ -185,7 +189,7 @@ class DataProcessor(threading.Thread):
                         logger.debug("Handling refresh_products_page request")
                         page = message.get('page', 1)
                         items_per_page = message.get('items_per_page', 20)
-                        result = self.get_products_page(page, items_per_page)
+                        result = self.refrech_products_details(page, items_per_page)
                         response = {
                             'type': 'response',
                             'action': action,
@@ -260,7 +264,7 @@ class DataProcessor(threading.Thread):
         except Exception as e:
             logger.error(f"Critical error in request handler: {str(e)}", exc_info=True)
 
-    def _initilized_data(self):
+    def _initialized_data(self):
         """Load data from database (if needed)"""
         logger.debug("ENTRY: DataProcessor.load_data()")
         
@@ -318,7 +322,6 @@ class DataProcessor(threading.Thread):
         self.categories = []  # List of unique categories for filters
         self.vendors = []  # List of unique vendors for filters 
 
-        self._initilized_data();
         
         try:
             while self.running:
