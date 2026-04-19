@@ -252,7 +252,7 @@ class SalePage(tk.Frame):
 
     def _on_filter_change(self, filters):
         """Handle filter changes"""
-        logger.error(f"ENTRY: SalePage._on_filter_change(filters={filters})")
+        logger.debug(f"ENTRY: SalePage._on_filter_change(filters={filters})")
 
         self.filter_on = False
         self.filter_products_details = [p for p in resource.products_details]
@@ -286,7 +286,6 @@ class SalePage(tk.Frame):
 
 
             #get serach filter
-            #TODO need to implimnet
             search_filter = filters["search"]
             if search_filter:
                 logger.debug(f"Search filter applied: '{search_filter}'")
@@ -299,7 +298,7 @@ class SalePage(tk.Frame):
 
 
             #refresh page
-            logger.error(f"Total products after filtering: {len(self.filter_products_details)}")
+            logger.debug(f"Total products after filtering: {len(self.filter_products_details)}")
             start_point = config.items_per_page * (self.current_page - 1)
             logger.debug(f"Calculating page slice: start={start_point}, end={start_point + config.items_per_page}")
             products = self.filter_products_details[start_point:start_point + config.items_per_page]

@@ -5,6 +5,7 @@ Order Table Panel - Top right section displaying order items in a Treeview.
 import tkinter as tk
 from tkinter import ttk
 from log.logging_config import get_logger
+import shared.configuration as config
 
 logger = get_logger(__name__)
 
@@ -82,7 +83,7 @@ class OrderTablePanel(tk.Frame):
         table_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
         
         # Create Treeview
-        columns = ("Item Name", "Unit Price", "Quantity", "Subtotal", "Actions")
+        columns = ("Item Name", "Unit Price", "Quantity", "Subtotal", "Delete")
         self.tree = ttk.Treeview(
             table_container,
             columns=columns,
@@ -97,7 +98,7 @@ class OrderTablePanel(tk.Frame):
             ("Unit Price", 90),
             ("Quantity", 80),
             ("Subtotal", 100),
-            ("Actions", 100)
+            ("Delete", 100)
         ]
         
         for col, width in column_config:
@@ -177,10 +178,10 @@ class OrderTablePanel(tk.Frame):
             # Insert new row with product details formatted for display
             row_id = self.tree.insert("", "end", values=(
                 product_name,  # Product name
-                f"₹{product_price:.2f}",  # Unit price in rupees
+                f"{config.currency_symbol}{product_price:.2f}",  # Unit price in rupees
                 quantity,  # Current quantity (1)
-                f"₹{subtotal:.2f}",  # Subtotal (price * qty)
-                "⚙️ 🗑"  # Settings and delete icons
+                f"{config.currency_symbol}{subtotal:.2f}",  # Subtotal (price * qty)
+                "✖"  # Settings and delete icons
             ), tags=(tag,))  # Apply alternating row color
             
             # ========== Store Item Metadata ==========
@@ -230,10 +231,10 @@ class OrderTablePanel(tk.Frame):
         
         self.tree.item(row_id, values=(
             product_name,
-            f"₹{product_price:.2f}",
+            f"{config.currency_symbol}{product_price:.2f}",
             quantity,
-            f"₹{subtotal:.2f}",
-            "⚙️ 🗑"
+            f"{config.currency_symbol}{subtotal:.2f}",
+            "✖"
         ))
         
         if self.on_quantity_change:
@@ -264,22 +265,13 @@ class OrderTablePanel(tk.Frame):
         item = self.tree.identify_row(event.y)
         col = self.tree.identify_column(event.x)
 
-        if not item or col != "#5":
+        #if not item or col != "#5":
+        if not item:
             return
-
-        bbox = self.tree.bbox(item, col)
-        if not bbox:
-            return
-
-        x_offset = event.x - bbox[0]
-        width = bbox[2]
-
-        # ✅ More reliable split (40% / 60%)
-        is_settings = x_offset < width * 0.45
 
         for product_id, item_data in self.items.items():
             if item_data['row_id'] == item:
-                if is_settings:				 
+                if col != "#5":  # Actions column				 
                     if self.on_settings:
                         self.on_settings(product_id)
                 else:
