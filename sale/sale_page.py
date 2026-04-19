@@ -383,17 +383,21 @@ class SalePage(tk.Frame):
         """Handle product card click - add to order"""
         product_id = product.id if hasattr(product, 'id') else product.get('id')
         product_name = product.name if hasattr(product, 'name') else product.get('name', 'Unknown')
+        product_price = product.price if hasattr(product, 'price') else product.get('price', 0)
         logger.debug(f"ENTRY: SalePage._on_product_click(product_id={product_id}, name={product_name})")
         
         try:
             product_data = {
-                'id': 42,
-                'name': 'Organic Almonds 1kg',
-                'mrp': 799.00,
-                'quantity': 2,
-                'discount_price': 699.00,
+                'id': product_id,
+                'name': product_name,
+                'mrp': product_price,
+                'quantity': 1,
+                'discount_price': product_price,
             }
             result = open_edit_popup(self.winfo_toplevel(), product_data, None)
+            logger.error(f"Edit popup result: {result}")
+            product.price = result.get('discount_price', product_price)
+            product.quantity = result.get('quantity', 1)
 
             logger.debug(f"Adding product to order: {product_name}")
             self.order_table.add_item(product)

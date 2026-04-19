@@ -113,15 +113,16 @@ class OrderTablePanel(tk.Frame):
     # ================= Data =================
     def add_item(self, product):
         product_id = product.id if hasattr(product, 'id') else product.get('id')
+        product_qty = product.quantity if hasattr(product, 'quantity') else product.get('quantity', 1)
 
         if product_id in self.items:
-            self.update_quantity(product_id, self.items[product_id]['quantity'] + 1)
+            self.update_quantity(product_id, self.items[product_id]['quantity'] + product_qty)
             return
 
         name = product.name if hasattr(product, 'name') else product.get('name', '')
         price = product.price if hasattr(product, 'price') else product.get('price', 0)
 
-        qty = 1
+        qty = product_qty
         subtotal = qty * price
 
         tag = 'evenrow' if len(self.items) % 2 == 0 else 'oddrow'
