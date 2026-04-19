@@ -449,7 +449,7 @@ def main():
         # Usage: set LOG_LEVEL=DEBUG  (or WARNING/ERROR)
         # Default is ERROR
         import os
-        log_level = os.environ.get('LOG_LEVEL', 'ERROR').upper()
+        log_level = os.environ.get('LOG_LEVEL', 'DEBUG').upper()
         valid_levels = ['ERROR', 'WARNING', 'DEBUG']
         if log_level not in valid_levels:
             logger.warning(f"Invalid LOG_LEVEL '{log_level}'. Using ERROR. Valid options: {', '.join(valid_levels)}")

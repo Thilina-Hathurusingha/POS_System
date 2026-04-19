@@ -13,6 +13,7 @@ from sale.checkout import CheckoutPanel
 from log.logging_config import get_logger
 import shared.resource as resource
 import shared.configuration as config
+from sale.setting_pop import open_edit_popup
 
 # ========== Initialize Logger ==========
 logger = get_logger(__name__)
@@ -385,6 +386,15 @@ class SalePage(tk.Frame):
         logger.debug(f"ENTRY: SalePage._on_product_click(product_id={product_id}, name={product_name})")
         
         try:
+            product_data = {
+                'id': 42,
+                'name': 'Organic Almonds 1kg',
+                'mrp': 799.00,
+                'quantity': 2,
+                'discount_price': 699.00,
+            }
+            result = open_edit_popup(self.winfo_toplevel(), product_data, None)
+
             logger.debug(f"Adding product to order: {product_name}")
             self.order_table.add_item(product)
             logger.debug("Product added successfully")
