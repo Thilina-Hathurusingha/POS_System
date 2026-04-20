@@ -190,19 +190,18 @@ class SalePage(tk.Frame):
         try:
             # Get reference to main app for sending requests
             root = self.winfo_toplevel()
-            if hasattr(root, 'send_request_to_processor'):
+            if hasattr(root ,'send_request_to_processor'):
                 logger.debug("Sending requests for categories, vendors, and products to data processor...")
                 
                 
                 # Request refresh the products details
                 self.refresh_products_page_request_id = root.send_request_to_processor(
                     action='refresh_products_page',
+                    source = 'sale',
                     request_data={'page': 1, 'items_per_page': config.items_per_page}
                 )
                 logger.debug(f"Sent products page request: {self.refresh_products_page_request_id}")
                 
-                # Schedule checking for responses (non-blocking)
-                self.after(100, self._check_responses, root)
             else:
                 logger.warning("Main app not available, cannot send requests")
             
@@ -211,15 +210,16 @@ class SalePage(tk.Frame):
         except Exception as e:
             logger.error(f"Failed to load initial data: {str(e)}", exc_info=True)
 
-    def _check_responses(self, root):
+    def check_responses(self, response):
         """Check if initial data responses are ready"""
         logger.debug("ENTRY: SalePage._check_initial_data_responses()")
+        #root = self.winfo_toplevel()
         
         try:
             
             # Check for products page response
             if hasattr(self, 'refresh_products_page_request_id') and not hasattr(self, 'products_loaded'):
-                response = root.get_response(self.refresh_products_page_request_id)
+                #response = root.get_response(self.refresh_products_page_request_id)
                 if response:
                     logger.debug(f"Received products page response")
                     products_page = response.get('data', {})

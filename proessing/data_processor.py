@@ -182,17 +182,20 @@ class DataProcessor(threading.Thread):
                 try:
                     action = message.get('action')
                     request_id = message.get('request_id')
+                    source = message.get('source')
                     logger.debug(f"Processing GUI request: {action}")
                     
                     # ========== Route Request to Appropriate Handler ==========
                     if action == 'refresh_products_page':
                         logger.debug("Handling refresh_products_page request")
-                        page = message.get('page', 1)
+                        page = message.get('page')
+                        logger.debug(f"page = {page}")
                         items_per_page = message.get('items_per_page', 20)
                         result = self.refrech_products_details(page, items_per_page)
                         response = {
                             'type': 'response',
                             'action': action,
+                            'source' : source,
                             'request_id': request_id,
                             'status': 'success',
                             'data': result

@@ -169,8 +169,8 @@ class MainApp(tk.Tk):
             
             # Sale page
             logger.debug("Creating Sale page...")
-            sale_page = SalePage(self.pages_container, data_processor=self.data_processor, name="sale")
-            self.pages["sale"] = sale_page
+            self.sale_page = SalePage(self.pages_container, data_processor=self.data_processor, name="sale")
+            self.pages["sale"] = self.sale_page
             logger.debug("Sale page created successfully")
             
             # Placeholder pages for other menu items
@@ -260,7 +260,7 @@ class MainApp(tk.Tk):
         
         logger.debug("EXIT: MainApp._on_data_available()")
 
-    def send_request_to_processor(self, action, request_data=None):
+    def send_request_to_processor(self, action, source = 'main',request_data=None):
         """
         Send a request to data processor and get response via event_queue.
         GUI puts request in queue and signals the processor thread.
@@ -272,17 +272,19 @@ class MainApp(tk.Tk):
         Returns:
             Request ID that can be used to match responses
         """
-        logger.debug(f"ENTRY: MainApp.send_request_to_processor(action={action})")
+        logger.debug(f"ENTRY: MainApp.send_request_to_processor(action={action})(page={source})")
         
         try:
             request_id = str(uuid.uuid4())
             
             request = {
                 'type': 'gui_request',
+                'source': source,
                 'action': action,
                 'request_id': request_id,
                 **(request_data or {})
             }
+            logger.debug(f"Constructed request: {request}")
             
             logger.debug(f"Putting request in queue: action={action}, request_id={request_id}")
             resource.GUI_event_queue.put(request)
@@ -306,16 +308,23 @@ class MainApp(tk.Tk):
                 
                 if message.get('type') == 'response':
                     logger.debug(f"Received response from data processor: action={message.get('action')}, status={message.get('status')}")
-                    request_id = message.get('request_id')
-                    action = message.get('action')
+                    #request_id = message.get('request_id')
+                    #action = message.get('action')
                     status = message.get('status')
+                    source = message.get('source')
                     
                     if status == 'success':
-                        logger.debug(f"Response successful for request {request_id}: {action}")
+                        logger.debug(f"Response successful for request {source}")
+
+                        match source:
+                            case 'sale':
+                                logger.debug("Passing response to SalePage...")
+                                self.sale_page.check_responses(message)
                         # Handle response data based on action
-                        self._handle_processor_response(action, request_id, message)
+                        #self._handle_processor_response(action, request_id, message)
+
                     else:
-                        logger.warning(f"Response error for request {request_id}: {message.get('error')}")
+                        logger.warning(f"Response error for request {source}: {message.get('error')}")
                 
                 else:
                     logger.debug(f"Received message from data processor: {message.get('type', 'unknown')}")
@@ -349,6 +358,7 @@ class MainApp(tk.Tk):
                     self._pending_responses = {}
                 self._pending_responses[request_id] = response
                 logger.debug(f"Response stored with key {request_id}")
+                self.sale_page.check_responses()
             
             elif action == 'filter_products':
                 logger.debug(f"Handling filter products response for request {request_id}")
@@ -449,7 +459,7 @@ def main():
         # Usage: set LOG_LEVEL=DEBUG  (or WARNING/ERROR)
         # Default is ERROR
         import os
-        log_level = os.environ.get('LOG_LEVEL', 'ERROR').upper()
+        log_level = os.environ.get('LOG_LEVEL', 'DEBUG').upper()
         valid_levels = ['ERROR', 'WARNING', 'DEBUG']
         if log_level not in valid_levels:
             logger.warning(f"Invalid LOG_LEVEL '{log_level}'. Using ERROR. Valid options: {', '.join(valid_levels)}")
