@@ -12,7 +12,7 @@ import time
 from typing import List, Dict, Any
 from log.logging_config import get_logger
 import shared.resource as resource
-from shared.data_struct import Category, Product, Vendor
+from shared.data_struct import Category, Product, Vendor, Batch
 
 # ========== Initialize Logger ==========
 logger = get_logger(__name__)
@@ -295,15 +295,24 @@ class DataProcessor(threading.Thread):
 
             #load the product data from the DB
             self.cursor.execute("""
-                SELECT product_id, name, mrp, discount_price, total_in_stock, category_id, vendor_id, description
+                SELECT product_id, name, mrp, price, total_in_stock, category_id, vendor_id, description, batch_id, cost
                 FROM products
                 ORDER BY product_id
             """)
 
             row = self.cursor.fetchall()
-            resource.products_details = [Product(id=r[0], name=r[1], description=r[7], price=r[3], category=r[5], vendor=r[6], stock=r[4]) for r in row]
+            resource.products_details = [Product(id=r[0], name=r[1], description=r[7], price=r[3], category=r[5], vendor=r[6], stock=r[4], batch_id=r[8], cost=r[9]) for r in row]
 
             
+            self.cursor.execute("""
+                SELECT batch_id, item_code, cost, mrp, price, quantity, in_stock
+                FROM stock
+                ORDER BY batch_id
+            """)
+
+            row = self.cursor.fetchall()
+            resource.stock_details = [Batch(batch_id=r[0], item_code=r[1], cost=r[2], mrp=r[3], price=r[4], quantity=r[5], in_stock=r[6]) for r in row]
+
             logger.debug("EXIT: DataProcessor.load_data() - Success")
             
         except Exception as e:

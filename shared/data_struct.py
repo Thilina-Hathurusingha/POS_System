@@ -10,6 +10,8 @@ class Product:
     category: int
     vendor: int
     stock: int
+    batch_id: int
+    cost: float
 
 @dataclass
 class Category:
@@ -20,3 +22,13 @@ class Category:
 class Vendor:
     id: int
     name: str
+
+@dataclass
+class Batch:
+    batch_id: int
+    item_code: int
+    cost: float
+    mrp: float
+    price: float
+    quantity: int
+    in_stock: int

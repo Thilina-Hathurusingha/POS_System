@@ -14,11 +14,13 @@
 ##### Interface
 
 GUI callback -> _on_data_available
+					- send the result to coresponding page
 BG thread -> main loop wait for request in GUI_event_queue
 
 ##### Request Paramters
 
 'type'			: <String type request code>,
+'source'		: page that trigger the request
 'action'		: <action>				-> can be add more action in future
 'request_id'	: <Unit id for each request. use to detect response>
 **(request_data or {})	-> unit paramter for given request
@@ -31,4 +33,4 @@ send_request_to_processor(self, action, request_data=None) -> main.py
 
 	# Sale_page.py
 	- refresh_products_page -> refrech the products_details, category_details, vendor_details
-	- 
+	-

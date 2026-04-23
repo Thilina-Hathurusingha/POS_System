@@ -7,6 +7,7 @@ from shared.data_struct import Category, Product, Vendor
 products_details = {}
 category_details = {}
 vendor_details = {}
+stock_details = {}
 
 
 # ========== Thread Synchronization ==========
