@@ -308,8 +308,6 @@ class MainApp(tk.Tk):
                 
                 if message.get('type') == 'response':
                     logger.debug(f"Received response from data processor: action={message.get('action')}, status={message.get('status')}")
-                    #request_id = message.get('request_id')
-                    #action = message.get('action')
                     status = message.get('status')
                     source = message.get('source')
                     
@@ -320,8 +318,7 @@ class MainApp(tk.Tk):
                             case 'sale':
                                 logger.debug("Passing response to SalePage...")
                                 self.sale_page.check_responses(message)
-                        # Handle response data based on action
-                        #self._handle_processor_response(action, request_id, message)
+
 
                     else:
                         logger.warning(f"Response error for request {source}: {message.get('error')}")
@@ -339,48 +336,6 @@ class MainApp(tk.Tk):
         
         logger.debug("EXIT: MainApp._check_data_queue_immediate()")
 
-    def _handle_processor_response(self, action, request_id, response):
-        """
-        Handle response from data processor based on action.
-        
-        Args:
-            action: The action that was requested
-            request_id: ID of the original request
-            response: Response message from processor
-        """
-        logger.debug(f"ENTRY: MainApp._handle_processor_response(action={action}, request_id={request_id})")
-        
-        try:
-            if action == 'refresh_products_page':
-                logger.debug(f"Handling products page response for request {request_id}")
-                # Store response for pages to retrieve
-                if not hasattr(self, '_pending_responses'):
-                    self._pending_responses = {}
-                self._pending_responses[request_id] = response
-                logger.debug(f"Response stored with key {request_id}")
-                self.sale_page.check_responses()
-            
-            elif action == 'filter_products':
-                logger.debug(f"Handling filter products response for request {request_id}")
-                if not hasattr(self, '_pending_responses'):
-                    self._pending_responses = {}
-                self._pending_responses[request_id] = response
-                logger.debug(f"Response stored with key {request_id}")
-            
-            elif action == 'get_categories_vendors':
-                logger.debug(f"Handling categories/vendors response for request {request_id}")
-                if not hasattr(self, '_pending_responses'):
-                    self._pending_responses = {}
-                self._pending_responses[request_id] = response
-                logger.debug(f"Response stored with key {request_id}")
-            
-            else:
-                logger.warning(f"Unknown action in response: {action}")
-            
-            logger.debug(f"EXIT: MainApp._handle_processor_response()")
-            
-        except Exception as e:
-            logger.error(f"Failed to handle processor response: {str(e)}", exc_info=True)
 
     def get_response(self, request_id):
         """
@@ -459,7 +414,7 @@ def main():
         # Usage: set LOG_LEVEL=DEBUG  (or WARNING/ERROR)
         # Default is ERROR
         import os
-        log_level = os.environ.get('LOG_LEVEL', 'DEBUG').upper()
+        log_level = os.environ.get('LOG_LEVEL', 'ERROR').upper()
         valid_levels = ['ERROR', 'WARNING', 'DEBUG']
         if log_level not in valid_levels:
             logger.warning(f"Invalid LOG_LEVEL '{log_level}'. Using ERROR. Valid options: {', '.join(valid_levels)}")

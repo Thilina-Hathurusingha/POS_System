@@ -395,7 +395,7 @@ class SalePage(tk.Frame):
                 'discount_price': product_price,
             }
             result = open_edit_popup(self.winfo_toplevel(), product_data, None)
-            logger.error(f"Edit popup result: {result}")
+            logger.debug(f"Edit popup result: {result}")
             product.price = result.get('discount_price', product_price)
             product.quantity = result.get('quantity', 1)
 
@@ -432,11 +432,41 @@ class SalePage(tk.Frame):
         except Exception as e:
             logger.error(f"Failed to handle item delete: {str(e)}", exc_info=True)
 
-    def _on_item_settings(self, product_id):
+    def _on_item_settings(self, product, qty):
         """Handle settings button click"""
-        logger.debug(f"ENTRY: SalePage._on_item_settings(product_id={product_id})")
-        logger.debug(f"Settings clicked for item {product_id}")
-        messagebox.showinfo("Settings", f"Settings for item {product_id}\n(Placeholder functionality)")
+
+        product_id = product.id if hasattr(product, 'id') else product.get('id')
+        product_name = product.name if hasattr(product, 'name') else product.get('name', 'Unknown')
+        product_price = product.price if hasattr(product, 'price') else product.get('price', 0)
+
+        logger.debug(f"ENTRY: SalePage._on_item_settings(product={product}) (qty={qty})")
+        
+
+        try:
+            # Placeholder for future settings functionality
+            logger.debug(f"Settings functionality not implemented yet for item {product_id}")
+            product_data = {
+                'id': product_id,
+                'name': product_name,
+                'mrp': product_price,
+                'quantity': qty,
+                'discount_price': product_price,
+            }
+
+            result = open_edit_popup(self.winfo_toplevel(), product_data, None)
+            logger.debug(f"Edit popup result: {result}")
+            if result:
+                product.price = result.get('discount_price', product_price)
+                product.quantity = result.get('quantity', qty)
+                self.order_table.update_item(product)
+                logger.debug(f"Item settings updated for {product_id}")
+                self._update_order_totals()
+
+
+        except Exception as e:
+            logger.error(f"Failed to handle item settings: {str(e)}", exc_info=True)
+
+
         logger.debug("EXIT: SalePage._on_item_settings()")
 
     def _update_order_totals(self):

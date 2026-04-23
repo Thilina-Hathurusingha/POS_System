@@ -170,6 +170,36 @@ class OrderTablePanel(tk.Frame):
         if self.on_quantity_change:
             self.on_quantity_change(product_id, quantity, subtotal)
 
+    def update_item(self, product):
+
+        logger.debug(f"ENTRY: OrderTablePanel.update_item(product={product})")
+        product_id = product.id if hasattr(product, 'id') else product.get('id')
+        price = product.price if hasattr(product, 'price') else product.get('price', 0)
+        quantity = product.quantity if hasattr(product, 'quantity') else product.get('quantity', 1)
+
+
+        if product_id not in self.items:
+            return
+
+        item = self.items[product_id]
+
+        self.items[product_id]["product"] = product
+
+        subtotal = price * quantity
+
+        name = product.name if hasattr(product, 'name') else product.get('name', '')
+
+        self.tree.item(item["row_id"], values=(
+            name,
+            f"{config.currency_symbol}{price:.2f}",
+            quantity,
+            f"{config.currency_symbol}{subtotal:.2f}",
+            "✖"
+        ))
+
+        if self.on_quantity_change:
+            self.on_quantity_change(product_id, quantity, subtotal)
+
     def remove_item(self, product_id):
         if product_id not in self.items:
             return
@@ -194,7 +224,9 @@ class OrderTablePanel(tk.Frame):
                     self.remove_item(product_id)
                 else:
                     if self.on_settings:
-                        self.on_settings(product_id)
+                        self.items[product_id]
+                        qty = self.items[product_id].get("quantity")
+                        self.on_settings(self.items[product_id].get("product"), qty)
                 break
 
     # ================= Utils =================
