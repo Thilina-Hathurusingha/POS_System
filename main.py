@@ -173,10 +173,29 @@ class MainApp(tk.Tk):
             self.pages["sale"] = self.sale_page
             logger.debug("Sale page created successfully")
             
-            # Placeholder pages for other menu items
-            placeholder_pages = ["inventory", "reports", "settings"]
-            logger.debug(f"Creating {len(placeholder_pages)} placeholder pages...")
-            for page_name in placeholder_pages:
+            # Inventory page (real UI)
+            try:
+                from inventory.inventory import InventoryPage
+                logger.debug("Creating Inventory page...")
+                self.inventory_page = InventoryPage(self.pages_container)
+                self.pages["inventory"] = self.inventory_page
+                logger.debug("Inventory page created successfully")
+            except Exception as e:
+                logger.error(f"Failed to load InventoryPage: {str(e)}", exc_info=True)
+                # Fallback placeholder if import fails
+                page = tk.Frame(self.pages_container, bg=self.BG_MAIN)
+                label = tk.Label(
+                    page,
+                    text="Inventory Page (Failed to load)",
+                    font=("Segoe UI", 16, "bold"),
+                    bg=self.BG_MAIN,
+                    fg="#EF4444"
+                )
+                label.pack(pady=100)
+                self.pages["inventory"] = page
+
+            # Placeholder pages for other menu items (except inventory)
+            for page_name in ["reports", "settings"]:
                 logger.debug(f"  Creating placeholder: {page_name}")
                 page = tk.Frame(self.pages_container, bg=self.BG_MAIN)
                 label = tk.Label(
@@ -197,7 +216,7 @@ class MainApp(tk.Tk):
 
     def _show_page(self, page_name):
         """Show specific page"""
-        logger.debug(f"ENTRY: MainApp._show_page(page_name={page_name})")
+        logger.error(f"ENTRY: MainApp._show_page(page_name={page_name})")
         
         try:
             if page_name not in self.pages:
