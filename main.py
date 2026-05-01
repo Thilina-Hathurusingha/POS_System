@@ -216,7 +216,7 @@ class MainApp(tk.Tk):
 
     def _show_page(self, page_name):
         """Show specific page"""
-        logger.error(f"ENTRY: MainApp._show_page(page_name={page_name})")
+        logger.debug(f"ENTRY: MainApp._show_page(page_name={page_name})")
         
         try:
             if page_name not in self.pages:
